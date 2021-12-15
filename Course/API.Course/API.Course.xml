@@ -23,5 +23,12 @@
             <param name="loginViewModelInput">Login view model</param>
             <returns>return status OK, user data and token in case of success</returns>
         </member>
+        <member name="M:API.Course.Controllers.UserController.Register(API.Course.Models.Users.RegisterViewModelInput)">
+            <summary>
+            This service allow to register a new user that not exists.
+            </summary>
+            <param name="registerViewModelInput">register View Model</param>
+            <returns></returns>
+        </member>
     </members>
 </doc>

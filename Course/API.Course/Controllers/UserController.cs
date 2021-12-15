@@ -1,8 +1,11 @@
-﻿using API.Course.Filters;
+﻿using API.Course.Business.Entities;
+using API.Course.Filters;
+using API.Course.Infraestructure.Data;
 using API.Course.Models;
 using API.Course.Models.Users;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Swashbuckle.AspNetCore.Annotations;
 using System;
@@ -65,11 +68,41 @@ namespace API.Course.Controllers
             });
         }
 
+        /// <summary>
+        /// This service allow to register a new user that not exists.
+        /// </summary>
+        /// <param name="registerViewModelInput">register View Model</param>
+        /// <returns></returns>
+        [SwaggerResponse(statusCode: 200, description: "Authentication success", Type = typeof(LoginViewModelInput))]
+        [SwaggerResponse(statusCode: 400, description: "Required fields", Type = typeof(FieldValidateViewModelOutput))]
+        [SwaggerResponse(statusCode: 500, description: "Internal error", Type = typeof(GenericErrorViewModel))]
         [HttpPost]
         [Route("register")]
         [ValidateModelStateCustom]
         public IActionResult Register(RegisterViewModelInput registerViewModelInput)
         {
+            var optionsBuilder = new DbContextOptionsBuilder<ClassesDbContext>();
+            optionsBuilder.UseSqlServer(@"Server=localhost\SQLEXPRESS01;Database=Course;Trusted_Connection=True");
+            //optionsBuilder.UseSqlServer("Server=localhost;Database=Course;user=sa;password=App@223020");
+
+            ClassesDbContext context = new ClassesDbContext(optionsBuilder.Options);
+
+            var pendingMigrations = context.Database.GetPendingMigrations();
+
+            if(pendingMigrations.Count() > 0)
+            {
+                context.Database.Migrate();
+            }
+
+            var user = new User();
+            user.Login = registerViewModelInput.Login;
+            user.Email = registerViewModelInput.Email;
+            user.Password = registerViewModelInput.Password;
+
+
+            context.User.Add(user);
+            context.SaveChanges();
+
             return Created("", registerViewModelInput);
         }
     }
