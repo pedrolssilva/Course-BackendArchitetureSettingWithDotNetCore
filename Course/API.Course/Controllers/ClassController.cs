@@ -1,4 +1,6 @@
-﻿using API.Course.Models.Courses;
+﻿using API.Course.Business.Entities;
+using API.Course.Business.Repositories;
+using API.Course.Models.Courses;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -14,8 +16,15 @@ namespace API.Course.Controllers
     [Route("api/v1/courses")]
     [ApiController]
     [Authorize]
-    public class CourseController : ControllerBase
+    public class ClassController : ControllerBase
     {
+        private readonly IClassRepository _classRepository;
+
+        public ClassController(IClassRepository classRepository)
+        {
+            _classRepository = classRepository;
+        }
+
         /// <summary>
         /// Este serviço permite cadastrar curso para o usuário autenticado.
         /// </summary>
@@ -28,29 +37,21 @@ namespace API.Course.Controllers
         {
             try
             {
-                //CourseViewModelInput course = new CourseViewModelInput
-                //{
-                //    Name = courseViewModelInput.Name,
-                //    Description = courseViewModelInput.Description
-                //};
+                Class classe = new Class();
+                classe.Name = courseViewModelInput.Name;
+                classe.Description = courseViewModelInput.Description;
 
-                //var codigoUsuario = int.Parse(User.FindFirst(c => c.Type == ClaimTypes.NameIdentifier)?.Value);
-                //course.CodigoUsuario = codigoUsuario;
-                //_cursoRepository.Adicionar(course);
-                //_cursoRepository.Commit();
-
-                //var cursoViewModelOutput = new CourseViewModelInput
-                //{
-                //    Nome = curso.Nome,
-                //    Descricao = curso.Descricao,
-                //};
 
                 var userCode = int.Parse(User.FindFirst(c => c.Type == ClaimTypes.NameIdentifier)?.Value);
+                classe.UserCode = userCode;
+                _classRepository.Add(classe);
+                _classRepository.Commit();
+
                 return Created("", courseViewModelInput);
             }
             catch (Exception ex)
             {
-               // _logger.LogError(ex.ToString());
+                // _logger.LogError(ex.ToString());
                 return new StatusCodeResult(500);
             }
         }
@@ -67,23 +68,15 @@ namespace API.Course.Controllers
         {
             try
             {
-                //var userCode = int.Parse(User.FindFirst(c => c.Type == ClaimTypes.NameIdentifier)?.Value);
+                var userCode = int.Parse(User.FindFirst(c => c.Type == ClaimTypes.NameIdentifier)?.Value);
 
-                //var courses = _cursoRepository.ObterPorUsuario(userCode)
-                //    .Select(s => new CursoViewModelOutput()
-                //    {
-                //        Nome = s.Nome,
-                //        Descricao = s.Descricao
-                //    });
-
-                var courses = new List<CourseViewModelOutput>();
-                courses.Add(new CourseViewModelOutput()
+                var courses = _classRepository.GetByUserCode(userCode).Select(s => new CourseViewModelInput()
                 {
-                    Login = "",
-                    Name = "teste",
-                    Description = "teste"
+                    Name = s.Name,
+                    Description = s.Description,
+                    Login = s.User.Login
                 });
-                
+
                 return Ok(courses);
             }
             catch (Exception ex)

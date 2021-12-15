@@ -1,20 +1,17 @@
 ﻿using API.Course.Business.Entities;
+using API.Course.Business.Repositories;
+using API.Course.Configurations;
 using API.Course.Filters;
-using API.Course.Infraestructure.Data;
 using API.Course.Models;
 using API.Course.Models.Users;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using Swashbuckle.AspNetCore.Annotations;
 using System;
-using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
-using System.Linq;
 using System.Security.Claims;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace API.Course.Controllers
 {
@@ -22,6 +19,19 @@ namespace API.Course.Controllers
     [ApiController]
     public class UserController : ControllerBase
     {
+        private readonly IUserRepository _userRepository;
+        private readonly IAuthenticationService _authenticationService;
+
+        public UserController(
+            IUserRepository userRepository,
+            IAuthenticationService authenticationService
+            )
+        {
+            _userRepository = userRepository;
+            _authenticationService = authenticationService;
+        }
+
+
         /// <summary>
         /// This service allow to authenticate active user registered.
         /// </summary>
@@ -35,31 +45,26 @@ namespace API.Course.Controllers
         [ValidateModelStateCustom]
         public IActionResult Login(LoginViewModelInput loginViewModelInput)
         {
+            User user = _userRepository.GetUser(loginViewModelInput.Login);
+
+            if(user == null)
+            {
+                return BadRequest("Error when trying access.");
+            }
+
+            //if (user.Password != loginViewModelInput.Password.GenerateCryptographicPassword())
+            //{
+            //    return BadRequest("Error when trying access.");
+            //}
+
             var userViewModelOutput = new UserViewModelOutput()
             {
-                Code = 1,
-                Login = "leandrobianch",
-                email = "leandrobianch@gmail.com"
+                Code = user.Code,
+                Login = loginViewModelInput.Login,
+                email = user.Email
             };
 
-            var secret = Encoding.ASCII.GetBytes("MzfsT&d9gprP>!9$Es(X!5g@;ef!5sbk:jH\\2.}8ZP'qY#7");
-            var symmetricSecurityKey = new SymmetricSecurityKey(secret);
-            var securityTokenDescriptor = new SecurityTokenDescriptor
-            {
-                Subject = new ClaimsIdentity(new Claim[]
-                {
-                    new Claim(ClaimTypes.NameIdentifier, userViewModelOutput.Code.ToString()),
-                    new Claim(ClaimTypes.Name, userViewModelOutput.Login),
-                    new Claim(ClaimTypes.Email, userViewModelOutput.email)
-                }),
-                Expires = DateTime.UtcNow.AddDays(1),
-                SigningCredentials = new SigningCredentials(symmetricSecurityKey, SecurityAlgorithms.HmacSha256Signature)
-            };
-
-            var jwtSecurityTokenHandler = new JwtSecurityTokenHandler();
-            var tokenGenerated = jwtSecurityTokenHandler.CreateToken(securityTokenDescriptor);
-            var token = jwtSecurityTokenHandler.WriteToken(tokenGenerated);
-
+            var token = _authenticationService.GenerateToken(userViewModelOutput);
 
             return Ok(new
             {
@@ -81,18 +86,13 @@ namespace API.Course.Controllers
         [ValidateModelStateCustom]
         public IActionResult Register(RegisterViewModelInput registerViewModelInput)
         {
-            var optionsBuilder = new DbContextOptionsBuilder<ClassesDbContext>();
-            optionsBuilder.UseSqlServer(@"Server=localhost\SQLEXPRESS01;Database=Course;Trusted_Connection=True");
-            //optionsBuilder.UseSqlServer("Server=localhost;Database=Course;user=sa;password=App@223020");
 
-            ClassesDbContext context = new ClassesDbContext(optionsBuilder.Options);
+            //var pendingMigrations = context.Database.GetPendingMigrations();
 
-            var pendingMigrations = context.Database.GetPendingMigrations();
-
-            if(pendingMigrations.Count() > 0)
-            {
-                context.Database.Migrate();
-            }
+            //if(pendingMigrations.Count() > 0)
+            //{
+            //    context.Database.Migrate();
+            //}
 
             var user = new User();
             user.Login = registerViewModelInput.Login;
@@ -100,8 +100,8 @@ namespace API.Course.Controllers
             user.Password = registerViewModelInput.Password;
 
 
-            context.User.Add(user);
-            context.SaveChanges();
+            _userRepository.Add(user);
+            _userRepository.Commit();
 
             return Created("", registerViewModelInput);
         }
